@@ -1,0 +1,378 @@
+{
+  "name": "Resumo diário de e-mails (9h) → agenda",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "38dc5a6c-a0d1-43b1-a1ff-59d4368a3037",
+      "name": "Todo dia 9h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c1",
+              "name": "provider",
+              "value": "ollama",
+              "type": "string"
+            },
+            {
+              "id": "c2",
+              "name": "ollamaUrl",
+              "value": "http://host.docker.internal:11434",
+              "type": "string"
+            },
+            {
+              "id": "c3",
+              "name": "ollamaModel",
+              "value": "qwen2.5:7b",
+              "type": "string"
+            },
+            {
+              "id": "c4",
+              "name": "claudeModel",
+              "value": "claude-sonnet-5-5",
+              "type": "string"
+            },
+            {
+              "id": "c5",
+              "name": "maxEmails",
+              "value": 30,
+              "type": "number"
+            },
+            {
+              "id": "c6",
+              "name": "meuEmail",
+              "value": "COLOQUE_SEU_EMAIL_AQUI",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e01a4c4d-0bc4-43d7-928d-23d9708e1b97",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        208,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "limit": "={{ $('Config').first().json.maxEmails }}",
+        "filters": {
+          "q": "newer_than:1d in:inbox -subject:\"Resumo de e-mails\""
+        }
+      },
+      "id": "1e217468-a72c-42b8-a1de-de3cc4e42173",
+      "name": "Buscar e-mails (24h)",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        448,
+        96
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nconst clean = s => String(s || '').replace(/\\s+/g, ' ').trim();\nconst emails = $input.all().map(i => i.json).filter(e => e && e.id);\nconst list = emails.slice(0, Number(cfg.maxEmails) || 50).map((e, i) => ({\n  n: i + 1,\n  id: e.id,\n  de: clean(e.From),\n  assunto: clean(e.Subject),\n  snippet: clean(e.snippet).slice(0, 300)\n}));\nconst agora = $now.setZone('America/Fortaleza').toFormat(\"yyyy-MM-dd HH:mm (cccc)\");\n\nconst system = `Você é um assistente executivo que triá e-mails. Responda SOMENTE com um JSON válido, sem markdown e sem texto fora do JSON.\n\nFormato:\n{\n  \"resumo\": \"2 a 3 frases com o panorama do dia\",\n  \"emails\": [\n    {\n      \"n\": 1,\n      \"topico\": \"Financeiro/Cobrança | Clientes | Trabalho | Pessoal | Notificações/Newsletters | Outros\",\n      \"urgencia\": \"alta | media | baixa\",\n      \"motivo\": \"por que essa urgência (curto)\",\n      \"acao\": \"próxima ação objetiva, no imperativo (curto)\",\n      \"prazo\": \"YYYY-MM-DD ou null\",\n      \"precisa_agendar\": true\n    }\n  ]\n}\n\nRegras:\n- Inclua TODOS os e-mails recebidos, usando o mesmo \"n\".\n- urgencia \"alta\": prazo em até 48h, cobrança/pagamento pendente, cliente ou chefia aguardando, problema em andamento.\n- urgencia \"media\": exige resposta ou ação, mas sem prazo curto.\n- urgencia \"baixa\": informativo, newsletter, promoção, notificação automática.\n- precisa_agendar = true só quando há ação concreta a fazer (urgência alta ou media). Newsletters e promoções sempre false.\n- \"prazo\" só se estiver explícito ou claramente inferível no e-mail; caso contrário null.\n- Escreva em português do Brasil.`;\n\nconst userPrompt = `Data e hora atuais: ${agora}\\n\\nE-mails das últimas 24h (JSON):\\n${JSON.stringify(list)}`;\n\nreturn [{ json: { list, count: list.length, system, userPrompt } }];"
+      },
+      "id": "6a882170-a1a2-4307-af4d-f38ca7b2f3c4",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "i1",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1a3679cb-a4cc-44f3-b7e3-406b55e48f76",
+      "name": "Tem e-mails?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        880,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "i2",
+              "leftValue": "={{ $('Config').first().json.provider }}",
+              "rightValue": "ollama",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "f1ee63e4-1ea2-4d47-840d-fcb4ab6fe89c",
+      "name": "Usar Ollama?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1104,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.ollamaUrl }}/api/chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $('Config').first().json.ollamaModel, stream: false, format: 'json', options: { temperature: 0.2, num_ctx: 8192 }, messages: [ { role: 'system', content: $json.system }, { role: 'user', content: $json.userPrompt } ] }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "ef5d4f10-3c9b-4ad8-a585-e1565442bcc8",
+      "name": "Ollama",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.message?.content ?? $json.content?.find(c => c.type === 'text')?.text ?? '';\nlet data = null;\ntry { data = JSON.parse(raw); } catch (e) {\n  const m = raw.match(/\\{[\\s\\S]*\\}/);\n  if (m) { try { data = JSON.parse(m[0]); } catch (e2) {} }\n}\nif (!data || !Array.isArray(data.emails)) {\n  throw new Error('A IA não devolveu JSON válido: ' + raw.slice(0, 300));\n}\n\nconst list = $('Prepare').first().json.list;\nconst zone = 'America/Fortaleza';\nconst hoje = DateTime.now().setZone(zone).startOf('day');\nconst ordem = { alta: 0, media: 1, baixa: 2 };\nconst emoji = { alta: '🔴', media: '🟡', baixa: '🟢' };\nconst esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\n\nconst itens = data.emails.map(x => {\n  const o = list.find(l => l.n === x.n) || {};\n  const urg = ordem[x.urgencia] !== undefined ? x.urgencia : 'baixa';\n  return { ...x, urgencia: urg, de: o.de || '', assunto: o.assunto || '' };\n}).sort((a, b) => ordem[a.urgencia] - ordem[b.urgencia]);\n\nconst events = itens.filter(x => x.precisa_agendar === true).map(x => {\n  let dia = hoje;\n  let hora = x.urgencia === 'alta' ? 11 : 16;\n  if (/^\\d{4}-\\d{2}-\\d{2}$/.test(x.prazo || '')) {\n    const d = DateTime.fromISO(x.prazo, { zone });\n    if (d.isValid && d >= hoje) { dia = d; hora = 9; }\n  }\n  const start = dia.set({ hour: hora, minute: 0, second: 0, millisecond: 0 });\n  return {\n    start: start.toISO(),\n    end: start.plus({ minutes: 30 }).toISO(),\n    summary: `${emoji[x.urgencia]} ${x.acao || x.assunto}`.slice(0, 120),\n    description: `De: ${x.de}\\nAssunto: ${x.assunto}\\nMotivo: ${x.motivo || ''}\\nPrazo: ${x.prazo || '—'}\\nTópico: ${x.topico || ''}`\n  };\n});\n\nconst cont = { alta: 0, media: 0, baixa: 0 };\nitens.forEach(i => cont[i.urgencia]++);\nconst topicos = {};\nitens.forEach(i => { (topicos[i.topico || 'Outros'] ||= []).push(i); });\n\nlet html = `<h2>📬 Resumo dos e-mails — ${hoje.toFormat('dd/MM/yyyy')}</h2>`\n  + `<p>${esc(data.resumo || '')}</p>`\n  + `<p><b>${itens.length}</b> e-mails: 🔴 ${cont.alta} · 🟡 ${cont.media} · 🟢 ${cont.baixa} · 📅 ${events.length} na agenda</p>`;\nfor (const [t, arr] of Object.entries(topicos)) {\n  html += `<h3>${esc(t)} (${arr.length})</h3><ul>` + arr.map(i =>\n    `<li>${emoji[i.urgencia]} <b>${esc(i.assunto)}</b> — ${esc(i.de)}<br>${esc(i.acao || i.motivo || '')}`\n    + `${/^\\d{4}-/.test(i.prazo || '') ? ' <i>(prazo ' + esc(i.prazo) + ')</i>' : ''}</li>`\n  ).join('') + '</ul>';\n}\n\nreturn [{ json: { events, summaryHtml: html, subject: `📬 Resumo de e-mails — ${hoje.toFormat('dd/MM')} (🔴 ${cont.alta} urgentes)` } }];"
+      },
+      "id": "53402258-7e98-46ee-9aa7-e5fe28a9540c",
+      "name": "Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1584,
+        96
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "events",
+        "options": {}
+      },
+      "id": "983a4494-b175-4070-a256-85d64cf6b263",
+      "name": "Separar eventos",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "primary",
+          "mode": "id"
+        },
+        "start": "={{ $json.start }}",
+        "end": "={{ $json.end }}",
+        "additionalFields": {
+          "description": "={{ $json.description }}",
+          "summary": "={{ $json.summary }}"
+        }
+      },
+      "id": "4ae04c14-b954-4e57-bfeb-18e79e7184e6",
+      "name": "Criar evento na agenda",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        2016,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Config').first().json.meuEmail }}",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.summaryHtml }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "id": "d6eb3a75-3177-40fd-a5e5-88c195133a91",
+      "name": "Enviar resumo",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1808,
+        224
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Todo dia 9h": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Buscar e-mails (24h)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar e-mails (24h)": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Tem e-mails?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem e-mails?": {
+      "main": [
+        [
+          {
+            "node": "Usar Ollama?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usar Ollama?": {
+      "main": [
+        [
+          {
+            "node": "Ollama",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Ollama": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "Separar eventos",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Enviar resumo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar eventos": {
+      "main": [
+        [
+          {
+            "node": "Criar evento na agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "tags": []
+}

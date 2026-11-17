@@ -1,0 +1,17 @@
+# Exports ORIGINAIS do n8n: contêm e-mails, IDs de credenciais e ID da instância.
+# Guarde-os fora do repositório ou com este sufixo. Publique só a versão limpa em workflow/.
+*.private.json
+export/
+exports/
+
+# Segredos e credenciais locais
+.env
+.env.*
+credentials*.json
+
+# Editor e sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+__pycache__/
